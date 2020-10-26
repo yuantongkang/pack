@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+option go_package = "github.com/buildpacks/pack/runtime";
+package runtime;
+
+// The Runtime service definition.
+service Runtime {
+  rpc SayHello (HelloRequest) returns (JSONMessage) {}
+}
+
+// The request message containing the user's name.
+message JSONMessage {
+  string stream = 1;
+  string status = 2;
+  Progress progress = 3;
+  string id = 4;
+  string from = 5;
+  int64 time = 6;
+  int64 timeNano = 7;
+  Error error = 20;
+}
+
+message Progress {
+  uint64 terminalFd = 1;
+  int64 current = 2;
+  int64 total = 3;
+  int64 start = 4;
+  bool hideCounts = 5;
+  string units = 6;
+  int64 winSize = 7;
+}
+
+message Error {
+  int64 code = 1;
+  string message = 2;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
