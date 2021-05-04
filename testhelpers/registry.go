@@ -194,8 +194,10 @@ func waitForPortBinding(t *testing.T, containerID, portSpec string, duration tim
 			}
 
 			portBindings := inspect.NetworkSettings.Ports[nat.Port(portSpec)]
-			if len(portBindings) > 0 {
-				return portBindings[0].HostPort, nil
+			for _, hostPortEntry := range portBindings {
+				if hostPortEntry.HostIP == "0.0.0.0" {
+					return hostPortEntry.HostPort, nil
+				}
 			}
 		case <-timer.C:
 			t.Fatalf("timeout waiting for port binding: %v", duration)
