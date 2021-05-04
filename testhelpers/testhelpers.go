@@ -18,7 +18,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -294,8 +293,8 @@ func hasMatches(actual, exp string) bool {
 	return len(matches) > 0
 }
 
-var dockerCliVal client.CommonAPIClient
-var dockerCliOnce sync.Once
+// var dockerCliVal client.CommonAPIClient
+// var dockerCliOnce sync.Once
 var dockerCliErr error
 
 func dockerCli(t *testing.T) client.CommonAPIClient {
@@ -396,40 +395,40 @@ func CreateImageOnRemote(t *testing.T, dockerCli client.CommonAPIClient, registr
 	t.Helper()
 	imageName := registryConfig.RepoName(repoName)
 	CreateImage(t, dockerCli, imageName, dockerFile)
-	AssertNil(t, PushImage(dockerCli, imageName, registryConfig))
+	PushImage(t, dockerCli, imageName)
 	return imageName
 }
 
-func DockerRmi(dockerCli client.CommonAPIClient, repoNames ...string) error {
-	var err error
-	ctx := context.Background()
-	for _, name := range repoNames {
-		_, e := dockerCli.ImageRemove(
-			ctx,
-			name,
-			dockertypes.ImageRemoveOptions{Force: true, PruneChildren: true},
-		)
-		if e != nil && err == nil {
-			err = e
-		}
-	}
-	return err
-}
+// func DockerRmi(dockerCli client.CommonAPIClient, repoNames ...string) error {
+// 	var err error
+// 	ctx := context.Background()
+// 	for _, name := range repoNames {
+// 		_, e := dockerCli.ImageRemove(
+// 			ctx,
+// 			name,
+// 			dockertypes.ImageRemoveOptions{Force: true, PruneChildren: true},
+// 		)
+// 		if e != nil && err == nil {
+// 			err = e
+// 		}
+// 	}
+// 	return err
+// }
 
-func PushImage(dockerCli client.CommonAPIClient, ref string, registryConfig *TestRegistryConfig) error {
-	rc, err := dockerCli.ImagePush(context.Background(), ref, dockertypes.ImagePushOptions{RegistryAuth: registryConfig.RegistryAuth()})
-	if err != nil {
-		return errors.Wrap(err, "pushing image")
-	}
-
-	defer rc.Close()
-	err = checkResponse(rc)
-	if err != nil {
-		return errors.Wrap(err, "push response")
-	}
-
-	return nil
-}
+// func PushImage(dockerCli client.CommonAPIClient, ref string, registryConfig *TestRegistryConfig) error {
+// 	rc, err := dockerCli.ImagePush(context.Background(), ref, dockertypes.ImagePushOptions{RegistryAuth: registryConfig.RegistryAuth()})
+// 	if err != nil {
+// 		return errors.Wrap(err, "pushing image")
+// 	}
+//
+// 	defer rc.Close()
+// 	err = checkResponse(rc)
+// 	if err != nil {
+// 		return errors.Wrap(err, "push response")
+// 	}
+//
+// 	return nil
+// }
 
 func HTTPGetE(url string, headers map[string]string) (string, error) {
 	client := http.DefaultClient

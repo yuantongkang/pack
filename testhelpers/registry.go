@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,11 +13,8 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
-	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-
-	"github.com/buildpacks/pack/pkg/archive"
 )
 
 var registryContainerNames = map[string]string{
@@ -147,7 +141,11 @@ func startRegistry(t *testing.T, runRegistryName, username, password string) (st
 	registryContainerName := registryContainerNames[daemonInfo.OSType]
 	AssertNil(t, PullImageWithAuth(dockerCli(t), registryContainerName, ""))
 
-	htpasswdTar := generateHtpasswd(t, username, password)
+	tempDir, err := ioutil.TempDir("", "test.registry")
+	AssertNil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	htpasswdTar := generateHtpasswd(t, tempDir, username, password)
 	defer htpasswdTar.Close()
 
 	ctr, err := dockerCli(t).ContainerCreate(ctx, &dockercontainer.Config{
@@ -205,54 +203,54 @@ func waitForPortBinding(t *testing.T, containerID, portSpec string, duration tim
 	}
 }
 
-func DockerHostname(t *testing.T) string {
-	dockerCli := dockerCli(t)
+// func DockerHostname(t *testing.T) string {
+// 	dockerCli := dockerCli(t)
+//
+// 	daemonHost := dockerCli.DaemonHost()
+// 	u, err := url.Parse(daemonHost)
+// 	if err != nil {
+// 		t.Fatalf("unable to parse URI client.DaemonHost: %s", err)
+// 	}
+//
+// 	switch u.Scheme {
+// 	// DOCKER_HOST is usually remote so always use its hostname/IP
+// 	// Note: requires "insecure-registries" CIDR entry on Daemon config
+// 	case "tcp":
+// 		return u.Hostname()
+//
+// 	// if DOCKER_HOST is non-tcp, we assume that we are
+// 	// talking to the daemon over a local pipe.
+// 	default:
+// 		daemonInfo, err := dockerCli.Info(context.TODO())
+// 		if err != nil {
+// 			t.Fatalf("unable to fetch client.DockerInfo: %s", err)
+// 		}
+//
+// 		if daemonInfo.OSType == "windows" {
+// 			// try to lookup the host IP by helper domain name (https://docs.docker.com/docker-for-windows/networking/#use-cases-and-workarounds)
+// 			// Note: pack appears to not support /etc/hosts-based insecure-registries
+// 			addrs, err := net.LookupHost("host.docker.internal")
+// 			if err != nil {
+// 				t.Fatalf("unknown address response: %+v %s", addrs, err)
+// 			}
+// 			if len(addrs) != 1 {
+// 				t.Fatalf("ambiguous address response: %v", addrs)
+// 			}
+// 			return addrs[0]
+// 		}
+//
+// 		// Linux can use --network=host so always use "localhost"
+// 		return "localhost"
+// 	}
+// }
 
-	daemonHost := dockerCli.DaemonHost()
-	u, err := url.Parse(daemonHost)
-	if err != nil {
-		t.Fatalf("unable to parse URI client.DaemonHost: %s", err)
-	}
-
-	switch u.Scheme {
-	// DOCKER_HOST is usually remote so always use its hostname/IP
-	// Note: requires "insecure-registries" CIDR entry on Daemon config
-	case "tcp":
-		return u.Hostname()
-
-	// if DOCKER_HOST is non-tcp, we assume that we are
-	// talking to the daemon over a local pipe.
-	default:
-		daemonInfo, err := dockerCli.Info(context.TODO())
-		if err != nil {
-			t.Fatalf("unable to fetch client.DockerInfo: %s", err)
-		}
-
-		if daemonInfo.OSType == "windows" {
-			// try to lookup the host IP by helper domain name (https://docs.docker.com/docker-for-windows/networking/#use-cases-and-workarounds)
-			// Note: pack appears to not support /etc/hosts-based insecure-registries
-			addrs, err := net.LookupHost("host.docker.internal")
-			if err != nil {
-				t.Fatalf("unknown address response: %+v %s", addrs, err)
-			}
-			if len(addrs) != 1 {
-				t.Fatalf("ambiguous address response: %v", addrs)
-			}
-			return addrs[0]
-		}
-
-		// Linux can use --network=host so always use "localhost"
-		return "localhost"
-	}
-}
-
-func generateHtpasswd(t *testing.T, username string, password string) io.ReadCloser {
-	// https://docs.docker.com/registry/deploying/#restricting-access
-	// HTPASSWD format: https://github.com/foomo/htpasswd/blob/e3a90e78da9cff06a83a78861847aa9092cbebdd/hashing.go#L23
-	passwordBytes, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	reader := archive.CreateSingleFileTarReader("/registry_test_htpasswd", username+":"+string(passwordBytes))
-	return reader
-}
+// func generateHtpasswd(t *testing.T, username string, password string) io.ReadCloser {
+// 	// https://docs.docker.com/registry/deploying/#restricting-access
+// 	// HTPASSWD format: https://github.com/foomo/htpasswd/blob/e3a90e78da9cff06a83a78861847aa9092cbebdd/hashing.go#L23
+// 	passwordBytes, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+// 	reader := archive.CreateSingleFileTarReader("/registry_test_htpasswd", username+":"+string(passwordBytes))
+// 	return reader
+// }
 
 func setupDockerConfigWithAuth(t *testing.T, username string, password string, runRegistryHost string, runRegistryPort string) string {
 	dockerConfigDir, err := ioutil.TempDir("", "pack.test.docker.config.dir")

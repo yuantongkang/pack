@@ -2435,7 +2435,7 @@ include = [ "*.jar", "media/mountain.jpg", "/media/person.png", ]
 
 				when("--publish", func() {
 					it.Before(func() {
-						assert.Succeeds(h.PushImage(dockerCli, repoName, registryConfig))
+						h.PushImage(t, dockerCli, repoName)
 					})
 
 					when("--run-image", func() {
@@ -2444,7 +2444,7 @@ include = [ "*.jar", "media/mountain.jpg", "/media/person.png", ]
 						it.Before(func() {
 							runAfter = registryConfig.RepoName("run-after/" + h.RandString(10))
 							buildRunImage(runAfter, "contents-after-1", "contents-after-2")
-							assert.Succeeds(h.PushImage(dockerCli, runAfter, registryConfig))
+							h.PushImage(t, dockerCli, runAfter)
 						})
 
 						it.After(func() {
@@ -2616,7 +2616,7 @@ func createComplexBuilder(t *testing.T,
 	)
 
 	assert.Contains(output, fmt.Sprintf("Successfully created builder image '%s'", bldr))
-	assert.Succeeds(h.PushImage(dockerCli, bldr, registryConfig))
+	h.PushImage(t, dockerCli, bldr)
 
 	return bldr, nil
 }
@@ -2707,7 +2707,7 @@ func createBuilder(
 	)
 
 	assert.Contains(output, fmt.Sprintf("Successfully created builder image '%s'", bldr))
-	assert.Succeeds(h.PushImage(dockerCli, bldr, registryConfig))
+	h.PushImage(t, dockerCli, bldr)
 
 	return bldr, nil
 }
@@ -2752,9 +2752,7 @@ func createStack(t *testing.T, dockerCli client.CommonAPIClient, runImageMirror 
 	}
 
 	imageManager.TagImage(runImage, runImageMirror)
-	if err := h.PushImage(dockerCli, runImageMirror, registryConfig); err != nil {
-		return err
-	}
+	PushImage(t, dockerCli, runImageMirror)
 
 	return nil
 }

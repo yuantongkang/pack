@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -24,7 +25,7 @@ import (
 )
 
 var docker client.CommonAPIClient
-var registryConfig *h.TestRegistryConfig
+var dockerRegistry *h.DockerRegistry
 
 func TestFetcher(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -32,17 +33,30 @@ func TestFetcher(t *testing.T) {
 	color.Disable(true)
 	defer color.Disable(false)
 
-	h.RequireDocker(t)
-
-	registryConfig = h.RunRegistry(t)
-	defer registryConfig.StopRegistry(t)
-
-	// TODO: is there a better solution to the auth problem?
-	os.Setenv("DOCKER_CONFIG", registryConfig.DockerConfigDir)
-
-	var err error
-	docker, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
+	dockerConfigDir, err := ioutil.TempDir("", "test.docker.config.dir")
 	h.AssertNil(t, err)
+	defer os.RemoveAll(dockerConfigDir)
+
+	dockerRegistry = h.NewDockerRegistry(h.WithAuth(dockerConfigDir))
+	dockerRegistry.Start(t)
+	defer dockerRegistry.Stop(t)
+
+	os.Setenv("DOCKER_CONFIG", dockerRegistry.DockerDirectory)
+	defer os.Unsetenv("DOCKER_CONFIG")
+
+	docker = h.DockerCli(t)
+
+	// h.RequireDocker(t)
+	//
+	// registryConfig = h.RunRegistry(t)
+	// defer registryConfig.StopRegistry(t)
+	//
+	// // TODO: is there a better solution to the auth problem?
+	// os.Setenv("DOCKER_CONFIG", registryConfig.DockerConfigDir)
+	//
+	// var err error
+	// docker, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
+	// h.AssertNil(t, err)
 	spec.Run(t, "Fetcher", testFetcher, spec.Report(report.Terminal{}))
 }
 
@@ -56,7 +70,7 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 
 	it.Before(func() {
 		repo = "some-org/" + h.RandString(10)
-		repoName = registryConfig.RepoName(repo)
+		repoName = dockerRegistry.RepoName(repo)
 		fetcher = image.NewFetcher(logging.NewLogWithWriters(&outBuf, &outBuf), docker)
 	})
 
@@ -159,7 +173,7 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 
 						h.AssertNil(t, img.Save())
 
-						h.AssertNil(t, h.PushImage(docker, img.Name(), registryConfig))
+						h.PushImage(t, docker, img.Name())
 
 						var outCons *color.Console
 						outCons, output = h.MockWriterAndOutput()
@@ -231,7 +245,7 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 						h.AssertNil(t, remoteImg.SetLabel(label, "1"))
 						h.AssertNil(t, remoteImg.Save())
 
-						h.AssertNil(t, h.PushImage(docker, remoteImg.Name(), registryConfig))
+						h.PushImage(t, docker, remoteImg.Name())
 
 						remoteImgLabel, err = remoteImg.Label(label)
 						h.AssertNil(t, err)
