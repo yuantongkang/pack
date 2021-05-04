@@ -44,7 +44,6 @@ func TestFetcher(t *testing.T) {
 	os.Setenv("DOCKER_CONFIG", dockerRegistry.DockerDirectory)
 	defer os.Unsetenv("DOCKER_CONFIG")
 
-	docker = h.DockerCli(t)
 
 	// h.RequireDocker(t)
 	//
@@ -69,6 +68,7 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 	)
 
 	it.Before(func() {
+		docker = h.DockerCli(t)
 		repo = "some-org/" + h.RandString(10)
 		repoName = dockerRegistry.RepoName(repo)
 		fetcher = image.NewFetcher(logging.NewLogWithWriters(&outBuf, &outBuf), docker)
@@ -173,7 +173,7 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 
 						h.AssertNil(t, img.Save())
 
-						h.PushImage(t, docker, img.Name())
+						h.PushImage(t, docker, repoName)
 
 						var outCons *color.Console
 						outCons, output = h.MockWriterAndOutput()
